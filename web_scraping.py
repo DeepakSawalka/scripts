@@ -103,11 +103,31 @@ for i, section in enumerate(faculty_sections, start=1):
         "Title": title,
         "Department": department,
         "College": "",
-        "University": "",
+        "University": "N/A",
         "Description": research_interests,
         "profile_url": profile_url,
         "Phone Number" : phone_number,
     })
+
+for i, faculty in enumerate(faculty_data, start=1):
+    profile_url = faculty["profile_url"]
+    if profile_url != "N/A":
+        try:
+            # Navigate to the profile page
+            driver.get(profile_url)
+            WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+            # Extract university name from the profile page
+            education_info = driver.find_element(By.CSS_SELECTOR, "div.facarticle p").text.strip()
+            if "Education:" in education_info:
+                university_name = education_info.split("Education:")[1].strip().split(",")[1].strip()
+            else:
+                university_name = "N/A"
+        except Exception as e:
+            university_name = "N/A"
+
+        # Update the university name in the faculty data
+        faculty["University"] = university_name
 
 # Convert to DataFrame and save to CSV
 if faculty_data:
