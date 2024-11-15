@@ -70,14 +70,15 @@ for i, section in enumerate(faculty_sections, start=1):
         email = "N/A"
     try:
         phone_number = contact_info.text.split("\n")[1].strip() if "\n" in contact_info.text else "N/A"
+        if not phone_number[0].isdigit():
+            phone_number = "N/A"
     except:
         phone_number = "N/A"
-    
-     # Extract office location
+
     try:
-        office_location = contact_info.text.split("\n")[2].strip() if len(contact_info.text.split("\n")) > 2 else "N/A"
+        profile_url = section.find_element(By.CSS_SELECTOR, "h6 a[href]").get_attribute("href")
     except:
-        office_location = "N/A"
+        profile_url = "N/A"
     
     # Extract areas of impact
     try:
@@ -97,13 +98,15 @@ for i, section in enumerate(faculty_sections, start=1):
 
     # Add the extracted data to the list
     faculty_data.append({
+        "Email": email,
         "Name": name,
         "Title": title,
         "Department": department,
-        "Email": email,
-        "Office Location": office_location,
-        "Areas of Impact": areas_of_impact,
-        "Research Interests": research_interests
+        "College": "",
+        "University": "",
+        "Description": research_interests,
+        "profile_url": profile_url,
+        "Phone Number" : phone_number,
     })
 
 # Convert to DataFrame and save to CSV
