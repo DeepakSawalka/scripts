@@ -24,7 +24,7 @@ for attempt in range(max_retries):
     try:
         logging.info(f"Attempt {attempt + 1}: Waiting for faculty directory content to load...")
         WebDriverWait(driver, 30).until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.facentry.all-list"))
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.views-row"))
 )
         logging.info("Page content loaded successfully.")
         break
@@ -35,81 +35,35 @@ for attempt in range(max_retries):
             driver.quit()
             exit()
 
-# Proceed with the data extraction if the page loaded successfully
-faculty_data = []
 
-# Select elements containing faculty information
-faculty_sections = driver.find_elements(By.CSS_SELECTOR, "div.facentry.all-list")
+faculty_data = []
+faculty_sections = driver.find_elements(By.CSS_SELECTOR, "div.views-row")
 logging.info(f"Number of faculty sections found: {len(faculty_sections)}")
 
-# Loop through each faculty section and extract the required information
-for i, section in enumerate(faculty_sections, start=1):
-    # Extract the faculty name
+for section in faculty_sections:
+    # Extract the faculty name and profile URL
     try:
-    # Locate the <div class="facdata"> and find the <h4> element within it
-        name = section.find_element(By.CSS_SELECTOR, "div.facdata h4").text.strip()
+        name = section.find_element(By.CSS_SELECTOR, "h3.utprof__title a").text.strip()
+        profile_url = section.find_element(By.CSS_SELECTOR, "h3.utprof__title a").get_attribute("href")
     except:
         name = "N/A"
-    
-    # Extract the faculty position
-    try:
-        title = section.find_element(By.CSS_SELECTOR, "div.facdata p.facpos").text.strip()
-    except:
-        title = "N/A"
-    
-    # Extract the department title
-    try:
-        department = section.find_element(By.CSS_SELECTOR, "div.facdata p.depttitle").text.strip()
-    except:
-        department = "N/A"
-    
-    try:
-        contact_info = section.find_element(By.CLASS_NAME, "contact")
-        email = contact_info.find_element(By.CLASS_NAME, "email").text.strip()
-    except:
-        email = "N/A"
-    try:
-        phone_number = contact_info.text.split("\n")[1].strip() if "\n" in contact_info.text else "N/A"
-        if not phone_number[0].isdigit():
-            phone_number = "N/A"
-    except:
-        phone_number = "N/A"
-
-    try:
-        profile_url = section.find_element(By.CSS_SELECTOR, "h6 a[href]").get_attribute("href")
-    except:
         profile_url = "N/A"
-    
-    # Extract areas of impact
-    try:
-        # Find all <p class="test"> elements within <div class="impact"> and join their text
-        areas_of_impact = ", ".join([impact.text.strip() for impact in section.find_elements(By.CSS_SELECTOR, ".impact .test")])
-    except:
-        areas_of_impact = "N/A"
-    
-    # Extract research interests
-    try:
-    # Locate the <div class="facareas"> containing the research interests
-        research_div = section.find_element(By.CLASS_NAME, "facareas")
-    # Extract the text from the second <p> tag within this div (the detailed description)
-        research_interests = research_div.find_elements(By.TAG_NAME, "p")[1].text.strip()
-    except:
-        research_interests = "N/A"
 
-    # Add the extracted data to the list
+    # Add only the basic information initially
     faculty_data.append({
-        "Email": email,
+        "Email": "N/A",
         "Name": name,
-        "Title": title,
-        "Department": department,
-        "College": "",
-        "University": "N/A",
-        "Description": research_interests,
+        "Title": "N/A",
+        "Department": "N/A",
+        "College": "College of Liberal Arts",
+        "University": "University of Texas at Austin",
+        "Description": "N/A",
         "profile_url": profile_url,
-        "Phone Number" : phone_number,
+        "Phone Number" : "N/A",
     })
 
-for i, faculty in enumerate(faculty_data, start=1):
+# Step 2: Visit each profile URL and extract additional information
+for faculty in faculty_data:
     profile_url = faculty["profile_url"]
     if profile_url != "N/A":
         try:
@@ -117,23 +71,57 @@ for i, faculty in enumerate(faculty_data, start=1):
             driver.get(profile_url)
             WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
 
-            # Extract university name from the profile page
-            education_info = driver.find_element(By.CSS_SELECTOR, "div.facarticle p").text.strip()
-            if "Education:" in education_info:
-                university_name = education_info.split("Education:")[1].strip().split(",")[1].strip()
-            else:
-                university_name = "N/A"
-        except Exception as e:
-            university_name = "N/A"
+            # Extract additional information on the profile page
+            try:
+                h3_elements = driver.find_elements(By.CSS_SELECTOR, "h3.field__item")
+                title = h3_elements[1].text.strip() if len(h3_elements) > 1 else "N/A"
+                faculty["Title"] = title
+            except:
+                faculty["Title"] = "N/A"
+            
+            try:
+                department = driver.find_element(By.CSS_SELECTOR, "div.field__items span.field__item").text.strip()
+                faculty["Department"] = department
+            except:
+                faculty["Department"] = "N/A"
+            
+            try:
+                email = driver.find_element(By.CSS_SELECTOR, "div.utprof__email-address div.field__item a").text.strip()
+                faculty["Email"] = email
+            except:
+                faculty["Email"] = "N/A"
+            
+            try:
+                phone_number = driver.find_element(By.CSS_SELECTOR, "div.utprof__ph-number div.field__item a").text.strip()
+                if not phone_number[0].isdigit():
+                    phone_number = "N/A"
+                faculty["Phone Number"] = phone_number
+            except:
+                faculty["Phone Number"] = "N/A"
 
-        # Update the university name in the faculty data
-        faculty["University"] = university_name
+            try:
+                # Locate the parent container where the relevant <p> tag resides
+                parent_div = driver.find_element(By.CLASS_NAME, "utprof__content")
+                # Find all <p> tags within this container
+                p_elements = parent_div.find_elements(By.TAG_NAME, "p")
+                # Check if the second <p> tag exists and has meaningful content
+                if len(p_elements) > 1 and p_elements[1].text.strip():
+                    description = p_elements[1].text.strip()
+                else:
+                    description = "N/A"
+                faculty["Description"] = description
+            except:
+                faculty["Description"] = "N/A"
+
+
+        except Exception as e:
+            logging.warning(f"Could not retrieve information for profile {profile_url}: {e}")
 
 # Convert to DataFrame and save to CSV
 if faculty_data:
     logging.info("Faculty data extracted successfully.")
     df = pd.DataFrame(faculty_data)
-    csv_filename = "cockrell_faculty_directory.csv"
+    csv_filename = "clglblarts_faculty_directory.csv"
     df.to_csv(csv_filename, index=False)
     logging.info(f"Data saved to '{csv_filename}'")
 else:
@@ -141,3 +129,4 @@ else:
 
 # Close the browser
 driver.quit()
+
